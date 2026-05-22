@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use App\Models\Currency;
 use App\Services\ExchangeRateChartFormatter;
 use App\Services\ExchangeRateSyncService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
-class CurrencyController
+class CurrencyController extends Controller
 {
     public function __construct(
         private ExchangeRateSyncService $syncService,
@@ -16,31 +17,33 @@ class CurrencyController
 
     public function index(): JsonResponse
     {
-        $this->syncService->syncTodayIfMissing();
+        try {
+            $this->syncService->syncTodayIfMissing();
+        } catch (\Exception $e) {
+            Log::warning('CurrencyController: failed to sync today\'s rates', ['error' => $e->getMessage()]);
+        }
+
         $currencies = Currency::active()
-            ->with('exchangeRatesTo')
+            ->with(['exchangeRatesTo' => fn ($q) => $q->where('date', '>=', now()->subDays(2)->toDateString())])
             ->get()
             ->map(function (Currency $currency) {
                 $currencyData = $currency->toArray();
-                
-                // Format exchange rates as chart data
+
                 if ($currency->exchangeRatesTo->isNotEmpty()) {
-                    $chartData = ExchangeRateChartFormatter::formatChartData(
+                    $currencyData['chart_data'] = ExchangeRateChartFormatter::formatChartData(
                         $currency->exchangeRatesTo,
-                        'USD',  // Assuming source is USD
+                        'USD',
                         $currency->code,
-                        3  // Last 3 days
+                        3
                     );
-                    
-                    $currencyData['chart_data'] = $chartData;
                 }
-                
+
                 return $currencyData;
             });
 
         return response()->json([
             'success' => true,
-            'data' => $currencies,
+            'data'    => $currencies,
         ]);
     }
 }
