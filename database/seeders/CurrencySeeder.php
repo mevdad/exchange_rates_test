@@ -3,30 +3,27 @@
 namespace Database\Seeders;
 
 use App\Models\Currency;
-use Illuminate\Database\Seeder;
 use App\Services\ExchangeRateApiService;
+use Illuminate\Database\Seeder;
 
 class CurrencySeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
+    private const ACTIVE_CURRENCIES = ['USD', 'EUR', 'GBP', 'UAH'];
+
     public function run(): void
     {
-        $currencies = ['USD', 'EUR', 'GBP', 'UAH'];
         $apiService = app(ExchangeRateApiService::class);
-        $response = $apiService->listCurrencies();
-        $list = $response['currencies'] ?? [];
+        $response   = $apiService->listCurrencies();
+        $list       = $response['currencies'] ?? [];
 
-        foreach ($list as $currency=>$name) {
-            if(Currency::where('code', $currency)->exists()) {
-                continue; // Skip if currency already exists
-            }
-            Currency::factory()->create([
-                'code' => $currency,
-                'name' => $name,
-                'is_active' => \in_array($currency, $currencies),
-            ]);
+        foreach ($list as $code => $name) {
+            Currency::firstOrCreate(
+                ['code' => $code],
+                [
+                    'name'      => $name,
+                    'is_active' => in_array($code, self::ACTIVE_CURRENCIES, true),
+                ]
+            );
         }
     }
 }

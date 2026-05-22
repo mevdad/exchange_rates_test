@@ -13,10 +13,6 @@ class ExchangeRateSyncService
         private ExchangeRateApiService $apiService,
     ) {}
 
-    /**
-     * Sync today's rates only if they are not yet in the database.
-     * Returns true if sync was performed, false if data already existed.
-     */
     public function syncTodayIfMissing(): bool
     {
         $today = Carbon::today()->toDateString();
@@ -46,26 +42,32 @@ class ExchangeRateSyncService
         $created = 0;
         $skipped = 0;
 
+        $currencies = Currency::all()->keyBy('code');
+
         foreach ($quotes as $date => $rates) {
             foreach ($rates as $pair => $rate) {
                 $fromCode = substr($pair, 0, 3);
-                $toCode = substr($pair, 3);
+                $toCode   = substr($pair, 3);
 
-                $fromCurrency = Currency::firstWhere('code', $fromCode);
-                $toCurrency = Currency::firstWhere('code', $toCode);
+                $fromCurrency = $currencies->get($fromCode);
+                $toCurrency   = $currencies->get($toCode);
 
-                if ($fromCurrency && $toCurrency) {
-                    ExchangeRate::create([
-                        'from_currency_id' => $fromCurrency->id,
-                        'to_currency_id' => $toCurrency->id,
-                        'rate' => $rate,
-                        'date' => Carbon::parse($date),
-                    ]);
-                    $created++;
-                } else {
+                if (! $fromCurrency || ! $toCurrency) {
                     Log::warning("ExchangeRateSyncService: currency pair not found: {$fromCode}/{$toCode}");
                     $skipped++;
+                    continue;
                 }
+
+                ExchangeRate::updateOrCreate(
+                    [
+                        'from_currency_id' => $fromCurrency->id,
+                        'to_currency_id'   => $toCurrency->id,
+                        'date'             => Carbon::parse($date)->toDateString(),
+                    ],
+                    ['rate' => $rate]
+                );
+
+                $created++;
             }
         }
 
