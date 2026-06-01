@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Contracts\CurrencyProviderInterface;
 use App\Models\Currency;
-use App\Services\ExchangeRateApiService;
 use Illuminate\Database\Seeder;
 
 class CurrencySeeder extends Seeder
@@ -12,9 +12,8 @@ class CurrencySeeder extends Seeder
 
     public function run(): void
     {
-        $apiService = app(ExchangeRateApiService::class);
-        $response   = $apiService->listCurrencies();
-        $list       = $response['currencies'] ?? [];
+        $provider = app(CurrencyProviderInterface::class);
+        $list     = $provider->listCurrencies();
 
         foreach ($list as $code => $name) {
             Currency::firstOrCreate(

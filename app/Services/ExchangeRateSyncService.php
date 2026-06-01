@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Contracts\ExchangeRateProviderInterface;
 use App\Models\Currency;
 use App\Models\ExchangeRate;
 use Carbon\Carbon;
@@ -10,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 class ExchangeRateSyncService
 {
     public function __construct(
-        private ExchangeRateApiService $apiService,
+        private ExchangeRateProviderInterface $provider,
     ) {}
 
     public function syncTodayIfMissing(): bool
@@ -28,9 +29,9 @@ class ExchangeRateSyncService
 
     public function syncTimeframe(string $startDate, string $endDate): array
     {
-        $response = $this->apiService->getTimeframe($startDate, $endDate);
+        $quotes = $this->provider->getTimeframe($startDate, $endDate);
 
-        return $this->importQuotes($response['quotes'] ?? []);
+        return $this->importQuotes($quotes);
     }
 
     /**
